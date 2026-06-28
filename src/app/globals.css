@@ -1,26 +1,129 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #FFFFFF;
+  --bg-subtle: #F8F8F6;
+  --white: #FFFFFF;
+  --border: #EBEBEB;
+  --border-strong: #D4D0CA;
+  --ink: #111111;
+  --ink-mid: #444444;
+  --stone: #6B6B6B;
+  --stone-light: #ADADAD;
+  --gold: #A8864A;
+  --safe: #1E6641;
+  --warn: #8C5A10;
+  --danger: #9B2828;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+* { box-sizing: border-box; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow-x: hidden;
 }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+
+.luxury-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 6px 16px rgba(0,0,0,0.03);
+}
+
+/* Shoe shelf — real shelf edge */
+.shoe-shelf {
+  position: relative;
+}
+.shoe-shelf::after {
+  content: '';
+  position: absolute;
+  bottom: -14px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--ink);
+  opacity: 0.1;
+}
+
+.shoe-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.shoe-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.10), 0 4px 16px rgba(0,0,0,0.05);
+}
+
+.mileage-bar-track { background: #EBEBEB; }
+.mileage-bar-fill-safe { background: var(--safe); }
+.mileage-bar-fill-warn { background: var(--warn); }
+.mileage-bar-fill-danger { background: var(--danger); }
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--white);
+  padding: 0.55rem 1.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  border: 1px solid var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.btn-primary:hover:not(:disabled) { opacity: 0.72; }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--ink);
+  padding: 0.55rem 1.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--white);
+}
+.btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.input-luxury {
+  background: var(--white);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  padding: 0.6rem 0.85rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+  font-size: 1rem; /* 16px — prevents iOS auto-zoom on focus */
+}
+.input-luxury:focus { border-color: var(--ink); }
+.input-luxury::placeholder { color: var(--stone-light); }
+
+/* Ensure tap targets meet 44px minimum */
+.btn-primary, .btn-secondary {
+  min-height: 44px;
+}
+
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+}
+
+.retired-overlay { opacity: 0.45; }
