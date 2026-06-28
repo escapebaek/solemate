@@ -64,7 +64,38 @@ export default function HomePage() {
       .select('*')
       .order('sort_order', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false })
-    const loaded = (data as Shoe[]) || []
+    let loaded = (data as Shoe[]) || []
+
+    // For shoes missing an image, fall back to the community colorways pool
+    const noImg = loaded.filter(s => !s.image_url)
+    if (noImg.length > 0) {
+      const pairs = [
+        ...new Map(
+          noImg.map(s => [`${s.brand.toLowerCase()}|${s.model.toLowerCase()}`, { brand: s.brand, model: s.model }])
+        ).values(),
+      ]
+      const fallbacks: Record<string, string> = {}
+      await Promise.all(
+        pairs.map(async ({ brand, model }) => {
+          const { data: cw } = await supabase
+            .from('shoe_colorways')
+            .select('image_url')
+            .ilike('brand', brand)
+            .ilike('model', model)
+            .not('image_url', 'is', null)
+            .limit(1)
+            .maybeSingle()
+          if (cw?.image_url)
+            fallbacks[`${brand.toLowerCase()}|${model.toLowerCase()}`] = cw.image_url
+        })
+      )
+      loaded = loaded.map(s => {
+        if (s.image_url) return s
+        const key = `${s.brand.toLowerCase()}|${s.model.toLowerCase()}`
+        return fallbacks[key] ? { ...s, image_url: fallbacks[key] } : s
+      })
+    }
+
     setShoes(loaded)
     setLoading(false)
     loadRatings(loaded)

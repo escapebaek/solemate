@@ -371,17 +371,16 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
       return
     }
 
-    // Share uploaded/provided image to community colorways so other users see it
-    // Only do this when an image file was uploaded (not external API thumbnails)
-    if (imageFile && finalImageUrl && brand && model) {
+    // Share image to community colorways pool so other users see it when adding the same shoe
+    if (finalImageUrl && brand && model) {
       await supabase.from('shoe_colorways').insert({
         brand,
         model,
-        color: color || 'Default',
+        color: color || selectedColorway?.color || selected?.colorway || 'Default',
         image_url: finalImageUrl,
         created_by: user.id,
       })
-      // ignore errors (23505 = already exists, that's fine)
+      // ignore errors (23505 = already exists for this brand+model+color, that's fine)
     }
 
     onAdded()
