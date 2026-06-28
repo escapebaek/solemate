@@ -81,6 +81,9 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
   const [addingNewColor, setAddingNewColor] = useState(false)
   const [newColorName, setNewColorName] = useState('')
   const [newColorImageUrl, setNewColorImageUrl] = useState('')
+  const [newColorImageFile, setNewColorImageFile] = useState<File | null>(null)
+  const [newColorImagePreview, setNewColorImagePreview] = useState('')
+  const [newColorImageMode, setNewColorImageMode] = useState<'url' | 'file'>('url')
   const [savingColorway, setSavingColorway] = useState(false)
 
   // Form fields
@@ -154,20 +157,33 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
       } = await supabase.auth.getUser()
       if (!user) return
 
+      let colorwayImageUrl: string | null = newColorImageUrl.trim() || null
+
+      if (newColorImageMode === 'file' && newColorImageFile) {
+        const ext = newColorImageFile.name.split('.').pop()
+        const path = `${user.id}/${Date.now()}.${ext}`
+        const { error: uploadErr } = await supabase.storage
+          .from('shoe-images')
+          .upload(path, newColorImageFile)
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from('shoe-images').getPublicUrl(path)
+          colorwayImageUrl = urlData.publicUrl
+        }
+      }
+
       const { data: inserted, error: insertErr } = await supabase
         .from('shoe_colorways')
         .insert({
           brand: selected.brand || brand,
           model: selected.name || selected.model || model,
           color: newColorName.trim(),
-          image_url: newColorImageUrl.trim() || null,
+          image_url: colorwayImageUrl,
           created_by: user.id,
         })
         .select('id, color, image_url')
         .single()
 
       if (insertErr && insertErr.code !== '23505') {
-        // 23505 = unique violation (already exists)
         console.error(insertErr)
         return
       }
@@ -175,7 +191,7 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
       const newCw: Colorway = inserted ?? {
         id: `temp-${Date.now()}`,
         color: newColorName.trim(),
-        image_url: newColorImageUrl.trim() || null,
+        image_url: colorwayImageUrl,
       }
 
       setColorways(prev => [...prev, newCw])
@@ -183,6 +199,9 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
       setAddingNewColor(false)
       setNewColorName('')
       setNewColorImageUrl('')
+      setNewColorImageFile(null)
+      setNewColorImagePreview('')
+      setNewColorImageMode('url')
     } finally {
       setSavingColorway(false)
     }
@@ -349,10 +368,24 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
     if (insertErr) {
       setError(insertErr.message)
       setSaving(false)
-    } else {
-      onAdded()
-      onClose()
+      return
     }
+
+    // Share uploaded/provided image to community colorways so other users see it
+    // Only do this when an image file was uploaded (not external API thumbnails)
+    if (imageFile && finalImageUrl && brand && model) {
+      await supabase.from('shoe_colorways').insert({
+        brand,
+        model,
+        color: color || 'Default',
+        image_url: finalImageUrl,
+        created_by: user.id,
+      })
+      // ignore errors (23505 = already exists, that's fine)
+    }
+
+    onAdded()
+    onClose()
   }
 
   const allColorways: Colorway[] = selected
@@ -591,25 +624,78 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
                       placeholder="Color name (e.g. Midnight Navy/White)"
                       className="input-luxury w-full"
                     />
-                    <input
-                      type="url"
-                      value={newColorImageUrl}
-                      onChange={e => setNewColorImageUrl(e.target.value)}
-                      placeholder="Image URL (optional)"
-                      className="input-luxury w-full"
-                    />
-                    {newColorImageUrl.trim() && (
-                      <div className="relative h-24 bg-white border border-[var(--border)] overflow-hidden">
-                        <Image
-                          src={newColorImageUrl.trim()}
-                          alt="preview"
-                          fill
-                          className="object-contain p-1 mix-blend-multiply"
-                          unoptimized
-                          onError={() => setNewColorImageUrl('')}
-                        />
+
+                    {/* Image source switcher */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[0.6rem] tracking-[0.1em] uppercase text-[var(--stone)]">
+                        Photo <span className="normal-case tracking-normal font-normal text-[var(--stone-light)]">— optional, shared with community</span>
+                      </span>
+                      <div className="flex border border-[var(--border)] text-[0.6rem] overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => { setNewColorImageMode('url'); setNewColorImageFile(null); setNewColorImagePreview('') }}
+                          className={`px-2.5 py-1 transition-colors ${newColorImageMode === 'url' ? 'bg-[var(--ink)] text-white' : 'text-[var(--stone)] hover:text-[var(--ink)]'}`}
+                        >
+                          URL
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setNewColorImageMode('file'); setNewColorImageUrl('') }}
+                          className={`px-2.5 py-1 transition-colors ${newColorImageMode === 'file' ? 'bg-[var(--ink)] text-white' : 'text-[var(--stone)] hover:text-[var(--ink)]'}`}
+                        >
+                          Upload
+                        </button>
                       </div>
+                    </div>
+
+                    {newColorImageMode === 'url' ? (
+                      <>
+                        <input
+                          type="url"
+                          value={newColorImageUrl}
+                          onChange={e => setNewColorImageUrl(e.target.value)}
+                          placeholder="https://example.com/shoe.jpg"
+                          className="input-luxury w-full"
+                        />
+                        {newColorImageUrl.trim() && (
+                          <div className="relative h-24 bg-white border border-[var(--border)] overflow-hidden">
+                            <Image
+                              src={newColorImageUrl.trim()}
+                              alt="preview"
+                              fill
+                              className="object-contain p-1 mix-blend-multiply"
+                              unoptimized
+                              onError={() => setNewColorImageUrl('')}
+                            />
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {newColorImagePreview && (
+                          <div className="relative h-24 bg-white border border-[var(--border)] overflow-hidden">
+                            <Image
+                              src={newColorImagePreview}
+                              alt="preview"
+                              fill
+                              className="object-contain p-1 mix-blend-multiply"
+                            />
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={e => {
+                            const file = e.target.files?.[0]
+                            if (!file) return
+                            setNewColorImageFile(file)
+                            setNewColorImagePreview(URL.createObjectURL(file))
+                          }}
+                          className="text-xs text-[var(--stone)] file:bg-[var(--bg-subtle)] file:border file:border-[var(--border)] file:text-[var(--ink)] file:text-[0.65rem] file:font-medium file:px-3 file:py-1.5 file:mr-3 file:cursor-pointer file:tracking-wide w-full"
+                        />
+                      </>
                     )}
+
                     <div className="flex gap-2 pt-1">
                       <button
                         type="button"
@@ -617,6 +703,9 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
                           setAddingNewColor(false)
                           setNewColorName('')
                           setNewColorImageUrl('')
+                          setNewColorImageFile(null)
+                          setNewColorImagePreview('')
+                          setNewColorImageMode('url')
                         }}
                         className="btn-secondary text-xs py-1.5 px-3 flex-1 justify-center"
                       >
