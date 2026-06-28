@@ -43,7 +43,7 @@ export default function SignupPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-12">
           <h1 className="text-3xl font-black tracking-[0.3em] text-[var(--ink)]">
-            SOLEMARK
+            SOLEMATE
           </h1>
           <p className="text-[0.65rem] tracking-[0.25em] text-[var(--stone)] mt-2 uppercase">
             Running Shoe Collection

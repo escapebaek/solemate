@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SOLEMARK — Running Shoe Collection",
+  title: "SOLEMATE — Running Shoe Collection",
   description: "Manage your running shoe mileage and collection",
 };
 

@@ -51,7 +51,7 @@ export default function SummaryModal({ shoes, onClose }: Props) {
     const canvas = activeView === 0 ? canvasRef1.current : canvasRef2.current
     if (!canvas) return
     const a = document.createElement('a')
-    a.download = `solemark-${activeView === 0 ? 'summary' : 'heatmap'}-${new Date().toISOString().slice(0, 10)}.png`
+    a.download = `solemate-${activeView === 0 ? 'summary' : 'heatmap'}-${new Date().toISOString().slice(0, 10)}.png`
     a.href = canvas.toDataURL('image/png')
     a.click()
   }
@@ -189,7 +189,7 @@ function drawDonut(canvas: HTMLCanvasElement, shoes: Shoe[]) {
   ctx.font = `800 78px ${FF}`
   ctx.fillStyle = '#1C1C1E'
   setLS(ctx, '0.36em')
-  ctx.fillText('SOLEMARK', CX + 14, 148)
+  ctx.fillText('SOLEMATE', CX + 14, 148)
   setLS(ctx, '0px')
   ctx.font = `400 22px ${FF}`
   ctx.fillStyle = '#AEAEB2'
@@ -278,7 +278,7 @@ function drawDonut(canvas: HTMLCanvasElement, shoes: Shoe[]) {
   ctx.strokeStyle = '#E8E3DC'; ctx.lineWidth = 1
   ctx.beginPath(); ctx.moveTo(PAD, footY - 22); ctx.lineTo(W - PAD, footY - 22); ctx.stroke()
   ctx.textAlign = 'center'; ctx.font = `300 17px ${FF}`; ctx.fillStyle = '#D1D1D6'
-  setLS(ctx, '0.28em'); ctx.fillText('SOLEMARK', CX + 4, footY); setLS(ctx, '0px')
+  setLS(ctx, '0.28em'); ctx.fillText('SOLEMATE', CX + 4, footY); setLS(ctx, '0px')
 }
 
 // ─── View 2 : Treemap heatmap ─────────────────────────────────────────────
@@ -360,7 +360,7 @@ function drawTreemap(canvas: HTMLCanvasElement, shoes: Shoe[]) {
   ctx.font = `800 76px ${FF}`
   ctx.fillStyle = '#FFFFFF'
   setLS(ctx, '0.36em')
-  ctx.fillText('SOLEMARK', CX + 14, 100)
+  ctx.fillText('SOLEMATE', CX + 14, 100)
   setLS(ctx, '0px')
 
   ctx.font = `400 22px ${FF}`
@@ -481,6 +481,6 @@ function drawTreemap(canvas: HTMLCanvasElement, shoes: Shoe[]) {
   ctx.font = `300 16px ${FF}`
   ctx.fillStyle = 'rgba(255,255,255,0.2)'
   setLS(ctx, '0.22em')
-  ctx.fillText('SOLEMARK', W - OUTER_PAD - 4, barY + 46)
+  ctx.fillText('SOLEMATE', W - OUTER_PAD - 4, barY + 46)
   setLS(ctx, '0px')
 }

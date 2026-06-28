@@ -182,7 +182,7 @@ export default function HomePage() {
       <header className="border-b border-[var(--border)] bg-white sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <h1 className="text-base font-black tracking-[0.25em] text-[var(--ink)]">
-            SOLEMARK
+            SOLEMATE
           </h1>
 
           <div className="flex items-center gap-5">
