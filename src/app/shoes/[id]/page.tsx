@@ -44,7 +44,18 @@ export default function ShoeDetailPage() {
       supabase.from('runs').select('*').eq('shoe_id', id).order('date', { ascending: false }),
       supabase.auth.getUser(),
     ])
-    const loadedShoe = shoeData as Shoe
+    let loadedShoe = shoeData as Shoe
+    if (loadedShoe && !loadedShoe.image_url) {
+      const { data: cw } = await supabase
+        .from('shoe_colorways')
+        .select('image_url')
+        .ilike('brand', loadedShoe.brand)
+        .ilike('model', loadedShoe.model)
+        .not('image_url', 'is', null)
+        .limit(1)
+        .maybeSingle()
+      if (cw?.image_url) loadedShoe = { ...loadedShoe, image_url: cw.image_url }
+    }
     setShoe(loadedShoe)
     setRuns((runsData as Run[]) || [])
     setUserId(user?.id ?? null)
