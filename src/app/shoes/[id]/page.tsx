@@ -11,6 +11,7 @@ import MileageBar from '@/components/MileageBar'
 import AddRunModal from '@/components/AddRunModal'
 import EditShoeModal from '@/components/EditShoeModal'
 import ShoeComments from '@/components/ShoeComments'
+import ShoeAttributes from '@/components/ShoeAttributes'
 import { StarDisplay, StarInput } from '@/components/StarRating'
 import { getRunningShoeById, findRunningShoeByBrandModel } from '@/lib/running-shoes-db'
 
@@ -70,6 +71,7 @@ export default function ShoeDetailPage() {
         .from('shoe_ratings')
         .select('user_id, rating')
         .eq('shoe_ref', ref)
+        .not('rating', 'is', null)
       type RRow = { user_id: string; rating: number }
       if (ratingRows && ratingRows.length > 0) {
         const sum = (ratingRows as RRow[]).reduce((s, r) => s + Number(r.rating), 0)
@@ -103,6 +105,7 @@ export default function ShoeDetailPage() {
       .from('shoe_ratings')
       .select('rating')
       .eq('shoe_ref', ref)
+      .not('rating', 'is', null)
     if (ratingRows && ratingRows.length > 0) {
       const sum = (ratingRows as { rating: number }[]).reduce((s, r) => s + Number(r.rating), 0)
       setCommunityRating({ avg: parseFloat((sum / ratingRows.length).toFixed(2)), count: ratingRows.length })
@@ -467,6 +470,15 @@ export default function ShoeDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Fit & Feel */}
+        {shoe && (
+          <ShoeAttributes
+            shoeRef={shoe.sneaker_db_id || `${shoe.brand}|${shoe.model}`.toLowerCase()}
+            userId={userId}
+            userEmail={userEmail}
+          />
+        )}
 
         {/* Comments */}
         {shoe && (
