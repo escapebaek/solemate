@@ -146,46 +146,88 @@ export default function ShoeAttributes({ shoeRef, userId, userEmail }: Props) {
       <div className="px-5 py-3.5 border-b border-[var(--border)]">
         <p className="text-[0.6rem] tracking-[0.14em] text-[var(--stone)] uppercase font-medium">Fit & Feel</p>
       </div>
+
       <div className="divide-y divide-[var(--border)]">
         {ATTRS.map(attr => {
           const counts = community[attr.key]
+          const total = Object.values(counts).reduce((s, n) => s + n, 0)
           const myVal = mine[attr.key]
+          const topVal = total > 0
+            ? attr.options.reduce((a, b) => (counts[b.value] ?? 0) > (counts[a.value] ?? 0) ? b : a).value
+            : null
+
           return (
-            <div key={attr.key} className="px-5 py-3">
-              <div className="flex items-center gap-3">
-                <span className="text-[0.6rem] tracking-[0.12em] text-[var(--stone)] uppercase font-medium w-28 shrink-0">
-                  {attr.label}
-                </span>
-                <div className="flex gap-1.5 flex-wrap">
+            <div key={attr.key} className="px-5 py-4 space-y-3">
+              {/* Label */}
+              <p className="text-[0.6rem] tracking-[0.14em] text-[var(--stone)] uppercase font-medium">
+                {attr.label}
+              </p>
+
+              {/* Community distribution */}
+              {total > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[0.58rem] tracking-[0.08em] text-[var(--stone-light)] uppercase">
+                    Community · {total} {total === 1 ? 'vote' : 'votes'}
+                  </p>
                   {attr.options.map(opt => {
-                    const selected = myVal === opt.value
                     const count = counts[opt.value] ?? 0
+                    const pct = Math.round((count / total) * 100)
+                    const isTop = opt.value === topVal && count > 0
                     return (
-                      <button
-                        key={opt.value}
-                        onClick={() => pick(attr.key, opt.value)}
-                        disabled={!userId || busy === attr.key}
-                        className={`px-2.5 py-0.5 text-[0.65rem] tracking-wide border transition-all rounded-sm ${
-                          selected
-                            ? 'bg-[var(--ink)] text-white border-[var(--ink)]'
-                            : 'bg-transparent text-[var(--stone)] border-[var(--border)] hover:border-[var(--border-strong)] hover:text-[var(--ink)]'
-                        } disabled:opacity-40 disabled:cursor-default`}
-                      >
-                        {opt.label}
-                        {count > 0 && (
-                          <span className={`ml-1 tabular-nums text-[0.58rem] ${selected ? 'opacity-60' : 'text-[var(--stone-light)]'}`}>
-                            {count}
-                          </span>
-                        )}
-                      </button>
+                      <div key={opt.value} className="flex items-center gap-2">
+                        <span className={`text-[0.62rem] w-14 shrink-0 ${isTop ? 'text-[var(--ink)] font-semibold' : 'text-[var(--stone)]'}`}>
+                          {opt.label}
+                        </span>
+                        <div className="flex-1 h-1 bg-[var(--bg-subtle)] rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${isTop ? 'bg-[var(--ink)]' : 'bg-[var(--stone-light)]'}`}
+                            style={{ width: pct > 0 ? `${pct}%` : '2px' }}
+                          />
+                        </div>
+                        <span className={`text-[0.6rem] tabular-nums w-5 text-right ${isTop ? 'text-[var(--ink)] font-medium' : 'text-[var(--stone-light)]'}`}>
+                          {count}
+                        </span>
+                        <span className="text-[0.58rem] text-[var(--stone-light)] tabular-nums w-7 text-right">
+                          {pct > 0 ? `${pct}%` : ''}
+                        </span>
+                      </div>
                     )
                   })}
                 </div>
-              </div>
+              )}
+
+              {/* My pick */}
+              {userId && (
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[0.58rem] tracking-[0.08em] text-[var(--stone-light)] uppercase shrink-0">
+                    My Pick
+                  </span>
+                  <div className="flex gap-1.5">
+                    {attr.options.map(opt => {
+                      const selected = myVal === opt.value
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => pick(attr.key, opt.value)}
+                          disabled={busy === attr.key}
+                          className={`px-2.5 py-0.5 text-[0.65rem] tracking-wide border transition-all rounded-sm ${
+                            selected
+                              ? 'bg-[var(--ink)] text-white border-[var(--ink)]'
+                              : 'bg-transparent text-[var(--stone)] border-[var(--border)] hover:border-[var(--border-strong)] hover:text-[var(--ink)]'
+                          } disabled:opacity-40 disabled:cursor-default`}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )
         })}
       </div>
+
       {!userId && (
         <p className="text-[0.62rem] text-[var(--stone-light)] text-center py-3 border-t border-[var(--border)]">
           Sign in to share your fit & feel
