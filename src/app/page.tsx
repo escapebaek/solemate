@@ -130,11 +130,7 @@ export default function HomePage() {
   }
 
   async function setRetired(shoeId: string, retired: boolean) {
-    await fetch('/api/shoes', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: shoeId, is_retired: retired }),
-    })
+    await supabase.from('shoes').update({ is_retired: retired }).eq('id', shoeId)
     await loadShoes()
   }
 
@@ -159,11 +155,9 @@ export default function HomePage() {
     setShoes([...reordered, ...retired])
 
     // Persist to DB
-    await fetch('/api/shoes/reorder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: reordered.map(s => s.id) }),
-    })
+    await Promise.all(
+      reordered.map((s, index) => supabase.from('shoes').update({ sort_order: index }).eq('id', s.id))
+    )
   }
 
   const activeShoes = shoes.filter(s => !s.is_retired)
@@ -179,7 +173,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="border-b border-[var(--border)] bg-white sticky top-0 z-20">
+      <header className="safe-area-top border-b border-[var(--border)] bg-white sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <h1 className="text-base font-black tracking-[0.25em] text-[var(--ink)]">
             SOLEMATE

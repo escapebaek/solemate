@@ -127,3 +127,9 @@ body {
 }
 
 .retired-overlay { opacity: 0.45; }
+
+/* ── Capacitor / iOS safe area ──────────────────────────────────────────────
+   env() returns 0 on web — no visual effect there. On iOS WebView with
+   viewport-fit=cover these push content away from the notch and home bar. */
+.safe-area-top    { padding-top:    env(safe-area-inset-top); }
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }

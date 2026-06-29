@@ -12,6 +12,7 @@ import AddRunModal from '@/components/AddRunModal'
 import EditShoeModal from '@/components/EditShoeModal'
 import ShoeComments from '@/components/ShoeComments'
 import { StarDisplay, StarInput } from '@/components/StarRating'
+import { getRunningShoeById, findRunningShoeByBrandModel } from '@/lib/running-shoes-db'
 
 export default function ShoeDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -113,22 +114,14 @@ export default function ShoeDetailPage() {
 
   async function toggleRetired() {
     if (!shoe) return
-    const res = await fetch('/api/shoes', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: shoe.id, is_retired: !shoe.is_retired }),
-    })
-    if (res.ok) setShoe({ ...shoe, is_retired: !shoe.is_retired })
+    const { error } = await supabase.from('shoes').update({ is_retired: !shoe.is_retired }).eq('id', shoe.id)
+    if (!error) setShoe({ ...shoe, is_retired: !shoe.is_retired })
   }
 
   async function deleteRun(runId: string, distance: number) {
     const { error } = await supabase.from('runs').delete().eq('id', runId)
     if (error) return
-    await fetch('/api/shoes', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, current_mileage: Math.max(0, (shoe?.current_mileage || 0) - distance) }),
-    })
+    await supabase.from('shoes').update({ current_mileage: Math.max(0, (shoe?.current_mileage || 0) - distance) }).eq('id', id)
     await load()
   }
 
@@ -142,13 +135,16 @@ export default function ShoeDetailPage() {
   async function loadSpecsFromDB() {
     if (!shoe) return
     setLoadingSpecs(true)
-    const params = new URLSearchParams()
-    if (shoe.sneaker_db_id) params.set('id', shoe.sneaker_db_id)
-    else { params.set('brand', shoe.brand); params.set('model', shoe.model) }
-
-    const res = await fetch(`/api/shoe-specs?${params}`)
-    if (!res.ok) { setLoadingSpecs(false); return }
-    const data = await res.json()
+    const found = shoe.sneaker_db_id
+      ? getRunningShoeById(shoe.sneaker_db_id)
+      : findRunningShoeByBrandModel(shoe.brand, shoe.model)
+    if (!found) { setLoadingSpecs(false); return }
+    const data = {
+      weight: found.weight ?? null,
+      drop: found.drop ?? null,
+      stack_height: found.stack_height ?? null,
+      cushioning: found.cushioning ?? null,
+    }
 
     const updatedSpecs = {
       ...shoe.specs,
@@ -158,11 +154,7 @@ export default function ShoeDetailPage() {
       ...(data.cushioning && { cushioning: data.cushioning }),
     }
 
-    await fetch('/api/shoes', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: shoe.id, specs: updatedSpecs }),
-    })
+    await supabase.from('shoes').update({ specs: updatedSpecs }).eq('id', shoe.id)
 
     setShoe({ ...shoe, specs: updatedSpecs })
     setSpecsLoaded(true)
@@ -193,7 +185,7 @@ export default function ShoeDetailPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="border-b border-[var(--border)] bg-white sticky top-0 z-20">
+      <header className="safe-area-top border-b border-[var(--border)] bg-white sticky top-0 z-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
           <Link href="/" className="text-[var(--stone)] hover:text-[var(--ink)] transition-colors">
             <ArrowLeft size={17} />

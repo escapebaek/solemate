@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, Search, Loader2, Check, ChevronDown, ChevronUp, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { API_BASE } from '@/lib/api'
 import { SneakerSearchResult } from '@/lib/types'
 import Image from 'next/image'
 
@@ -110,7 +111,7 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
     if (!query.trim()) return
     setSearching(true)
     try {
-      const res = await fetch(`/api/sneaker-search?q=${encodeURIComponent(query)}`)
+      const res = await fetch(`${API_BASE}/api/sneaker-search?q=${encodeURIComponent(query)}`)
       const data = await res.json()
       setSearchResults(data.results || [])
     } catch {
@@ -122,21 +123,17 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
 
   async function loadColorways(b: string, m: string, defaultCw: Colorway) {
     setLoadingColorways(true)
-    try {
-      const res = await fetch(
-        `/api/shoe-colorways?brand=${encodeURIComponent(b)}&model=${encodeURIComponent(m)}`
-      )
-      const data = await res.json()
-      // Filter out any community entry that duplicates the default colorway name
-      const community: Colorway[] = (data.colorways || []).filter(
-        (cw: Colorway) => cw.color.toLowerCase() !== (defaultCw.color || '').toLowerCase()
-      )
-      setColorways(community)
-    } catch {
-      setColorways([])
-    } finally {
-      setLoadingColorways(false)
-    }
+    const { data } = await supabase
+      .from('shoe_colorways')
+      .select('id, color, image_url, created_at')
+      .ilike('brand', b)
+      .ilike('model', m)
+      .order('created_at', { ascending: true })
+    const community: Colorway[] = (data || []).filter(
+      (cw: Colorway) => cw.color.toLowerCase() !== (defaultCw.color || '').toLowerCase()
+    )
+    setColorways(community)
+    setLoadingColorways(false)
   }
 
   function selectColorway(cw: Colorway) {
@@ -405,7 +402,7 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
       onClick={onClose}
     >
       <div
-        className="luxury-card relative w-full sm:max-w-lg max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-none"
+        className="safe-area-bottom luxury-card relative w-full sm:max-w-lg max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-none"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5 border-b border-[var(--border)]">

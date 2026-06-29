@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, Upload, Loader2, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { API_BASE } from '@/lib/api'
 import Image from 'next/image'
 
 interface AddRunModalProps {
@@ -42,7 +43,7 @@ export default function AddRunModal({ shoeId, onClose, onAdded }: AddRunModalPro
     reader.onload = async () => {
       const base64 = (reader.result as string).split(',')[1]
       try {
-        const res = await fetch('/api/extract-distance', {
+        const res = await fetch(`${API_BASE}/api/extract-distance`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageBase64: base64, mimeType: imageFile.type }),
@@ -113,11 +114,7 @@ export default function AddRunModal({ shoeId, onClose, onAdded }: AddRunModalPro
       .single()
 
     if (shoe) {
-      await fetch('/api/shoes', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: shoeId, current_mileage: (shoe.current_mileage || 0) + km }),
-      })
+      await supabase.from('shoes').update({ current_mileage: (shoe.current_mileage || 0) + km }).eq('id', shoeId)
     }
 
     onAdded()
@@ -127,7 +124,7 @@ export default function AddRunModal({ shoeId, onClose, onAdded }: AddRunModalPro
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 modal-backdrop" onClick={onClose}>
       <div
-        className="luxury-card relative w-full sm:max-w-md max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-none"
+        className="safe-area-bottom luxury-card relative w-full sm:max-w-md max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-none"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5 border-b border-[var(--border)]">

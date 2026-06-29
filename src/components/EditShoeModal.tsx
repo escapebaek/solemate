@@ -113,15 +113,10 @@ export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalP
       specs: hasSpecs ? updatedSpecs : null,
     }
 
-    const res = await fetch('/api/shoes', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: shoe.id, ...payload }),
-    })
-    const json = await res.json()
+    const { error: updateError } = await supabase.from('shoes').update(payload).eq('id', shoe.id)
 
-    if (!res.ok) {
-      setError(json.error || 'Update failed')
+    if (updateError) {
+      setError(updateError.message || 'Update failed')
       setSaving(false)
     } else {
       const updated: Shoe = {
@@ -145,7 +140,7 @@ export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalP
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 modal-backdrop" onClick={onClose}>
       <div
-        className="luxury-card relative w-full sm:max-w-lg max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-none"
+        className="safe-area-bottom luxury-card relative w-full sm:max-w-lg max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-none"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5 border-b border-[var(--border)]">
