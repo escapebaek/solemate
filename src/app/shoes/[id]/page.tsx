@@ -14,6 +14,7 @@ import ShoeComments from '@/components/ShoeComments'
 import ShoeAttributes from '@/components/ShoeAttributes'
 import { StarDisplay, StarInput } from '@/components/StarRating'
 import { getRunningShoeById, findRunningShoeByBrandModel } from '@/lib/running-shoes-db'
+import { pickBestColorwayImage } from '@/lib/colorway'
 
 export default function ShoeDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -48,15 +49,15 @@ export default function ShoeDetailPage() {
     ])
     let loadedShoe = shoeData as Shoe
     if (loadedShoe && !loadedShoe.image_url) {
-      const { data: cw } = await supabase
+      const { data: cws } = await supabase
         .from('shoe_colorways')
-        .select('image_url')
+        .select('image_url, created_by')
         .ilike('brand', loadedShoe.brand)
         .ilike('model', loadedShoe.model)
         .not('image_url', 'is', null)
-        .limit(1)
-        .maybeSingle()
-      if (cw?.image_url) loadedShoe = { ...loadedShoe, image_url: cw.image_url }
+        .order('created_at', { ascending: true })
+      const img = pickBestColorwayImage(cws || [])
+      if (img) loadedShoe = { ...loadedShoe, image_url: img }
     }
     setShoe(loadedShoe)
     setRuns((runsData as Run[]) || [])

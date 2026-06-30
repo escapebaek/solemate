@@ -21,6 +21,7 @@ import {
 } from '@dnd-kit/sortable'
 import { createClient } from '@/lib/supabase/client'
 import { Shoe } from '@/lib/types'
+import { pickBestColorwayImage } from '@/lib/colorway'
 import ShoeCard from '@/components/ShoeCard'
 import SortableShoeCard from '@/components/SortableShoeCard'
 import AddShoeModal from '@/components/AddShoeModal'
@@ -78,16 +79,16 @@ export default function HomePage() {
       const fallbacks: Record<string, string> = {}
       await Promise.all(
         pairs.map(async ({ brand, model }) => {
-          const { data: cw } = await supabase
+          const { data: cws } = await supabase
             .from('shoe_colorways')
-            .select('image_url')
+            .select('image_url, created_by')
             .ilike('brand', brand)
             .ilike('model', model)
             .not('image_url', 'is', null)
-            .limit(1)
-            .maybeSingle()
-          if (cw?.image_url)
-            fallbacks[`${brand.toLowerCase()}|${model.toLowerCase()}`] = cw.image_url
+            .order('created_at', { ascending: true })
+          const img = pickBestColorwayImage(cws || [])
+          if (img)
+            fallbacks[`${brand.toLowerCase()}|${model.toLowerCase()}`] = img
         })
       )
       loaded = loaded.map(s => {
