@@ -1,4 +1,9 @@
-const ADMIN_USER_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID ?? ''
+const ADMIN_IDS = new Set(
+  (process.env.NEXT_PUBLIC_ADMIN_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean)
+)
+
+export const isAdmin = (userId: string | null | undefined): boolean =>
+  !!userId && ADMIN_IDS.has(userId)
 
 interface ColorwayRow {
   image_url: string | null
@@ -6,13 +11,13 @@ interface ColorwayRow {
 }
 
 /**
- * Priority: admin account → oldest by created_at (caller must pass rows ordered ASC)
+ * Priority: any admin account → oldest by created_at (caller must pass rows ordered ASC)
  */
 export function pickBestColorwayImage(rows: ColorwayRow[]): string | null {
   const withImg = rows.filter(r => r.image_url)
   if (!withImg.length) return null
-  if (ADMIN_USER_ID) {
-    const adminPick = withImg.find(r => r.created_by === ADMIN_USER_ID)
+  if (ADMIN_IDS.size > 0) {
+    const adminPick = withImg.find(r => r.created_by && ADMIN_IDS.has(r.created_by))
     if (adminPick?.image_url) return adminPick.image_url
   }
   return withImg[0]?.image_url ?? null
