@@ -70,10 +70,10 @@ export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalP
 
     let imageUrl: string | null = shoe.image_url ?? null
 
-    if (removeImage) {
-      imageUrl = null
-    } else if (imageMode === 'url' && imageUrlInput.trim()) {
+    if (imageMode === 'url' && imageUrlInput.trim()) {
       imageUrl = imageUrlInput.trim()
+    } else if (removeImage) {
+      imageUrl = null
     } else if (imageFile) {
       const ext = imageFile.name.split('.').pop()
       const path = `${user.id}/${Date.now()}.${ext}`
@@ -170,7 +170,7 @@ export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalP
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setImageMode('url'); setImageFile(null) }}
+                  onClick={() => { setImageMode('url'); setImageFile(null); setRemoveImage(false) }}
                   className={`px-3 py-1 transition-colors ${imageMode === 'url' ? 'bg-[var(--ink)] text-white' : 'text-[var(--stone)] hover:text-[var(--ink)]'}`}
                 >
                   URL
