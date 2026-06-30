@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, LogOut, PieChart } from 'lucide-react'
+import { Plus, LogOut, PieChart, GripVertical, Check } from 'lucide-react'
 import {
   DndContext,
   DragEndEvent,
@@ -38,6 +38,7 @@ export default function HomePage() {
   const [userId, setUserId] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [isLocked, setIsLocked] = useState(true)
 
   // Require 8px movement before drag starts — prevents accidental drags on tap
   const sensors = useSensors(
@@ -165,11 +166,6 @@ export default function HomePage() {
   const totalMileage = shoes.reduce((acc, s) => acc + s.current_mileage, 0)
   const activeShoe = activeId ? shoes.find(s => s.id === activeId) : null
 
-  const shelfRows: Shoe[][] = []
-  for (let i = 0; i < activeShoes.length; i += 3) {
-    shelfRows.push(activeShoes.slice(i, i + 3))
-  }
-
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -251,66 +247,74 @@ export default function HomePage() {
                   Active Collection
                 </h2>
                 <div className="h-px flex-1 bg-[var(--border)]" />
+                {activeShoes.length > 1 && (
+                  <button
+                    onClick={() => { setIsLocked(l => !l); setActiveId(null) }}
+                    className={`flex items-center gap-1.5 text-[0.62rem] tracking-wide px-2.5 py-1 border rounded-sm transition-all ${
+                      isLocked
+                        ? 'text-[var(--stone)] border-[var(--border)] hover:text-[var(--ink)] hover:border-[var(--border-strong)]'
+                        : 'text-white bg-[var(--ink)] border-[var(--ink)]'
+                    }`}
+                  >
+                    {isLocked ? <GripVertical size={11} /> : <Check size={11} />}
+                    {isLocked ? 'Reorder' : 'Done'}
+                  </button>
+                )}
               </div>
 
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={activeShoes.map(s => s.id)}
-                  strategy={rectSortingStrategy}
+              {isLocked ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-5">
+                  {activeShoes.map(shoe => {
+                    const ref = shoe.sneaker_db_id || `${shoe.brand}|${shoe.model}`.toLowerCase()
+                    return (
+                      <ShoeCard
+                        key={shoe.id}
+                        shoe={shoe}
+                        onRetire={() => setRetired(shoe.id, true)}
+                        ratingInfo={ratingMap[ref]}
+                      />
+                    )
+                  })}
+                  <button
+                    onClick={() => setShowAdd(true)}
+                    className="luxury-card border-dashed flex flex-col items-center justify-center min-h-[220px] text-[var(--stone-light)] hover:text-[var(--stone)] hover:border-[var(--border-strong)] transition-all group"
+                  >
+                    <Plus size={20} className="mb-2 group-hover:scale-105 transition-transform" />
+                    <span className="text-[0.6rem] tracking-[0.15em] uppercase">Add Shoe</span>
+                  </button>
+                </div>
+              ) : (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
                 >
-                  <div className="space-y-12 sm:space-y-20">
-                    {shelfRows.map((row, rowIdx) => (
-                      <div key={rowIdx} className="shoe-shelf pb-8">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-5">
-                          {row.map(shoe => {
-                            const ref = shoe.sneaker_db_id || `${shoe.brand}|${shoe.model}`.toLowerCase()
-                            return (
-                              <SortableShoeCard
-                                key={shoe.id}
-                                shoe={shoe}
-                                onRetire={() => setRetired(shoe.id, true)}
-                                ratingInfo={ratingMap[ref]}
-                              />
-                            )
-                          })}
-                          {rowIdx === shelfRows.length - 1 && row.length < 3 && (
-                            <button
-                              onClick={() => setShowAdd(true)}
-                              className="luxury-card border-dashed flex flex-col items-center justify-center min-h-[220px] text-[var(--stone-light)] hover:text-[var(--stone)] hover:border-[var(--border-strong)] transition-all group"
-                            >
-                              <Plus size={20} className="mb-2 group-hover:scale-105 transition-transform" />
-                              <span className="text-[0.6rem] tracking-[0.15em] uppercase">Add Shoe</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-
-                    {activeShoes.length > 0 && activeShoes.length % 3 === 0 && (
-                      <div className="flex justify-center">
-                        <button onClick={() => setShowAdd(true)} className="btn-secondary py-2.5 px-8">
-                          <Plus size={13} />
-                          Add Another Shoe
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </SortableContext>
-
-                {/* Ghost card shown under cursor while dragging */}
-                <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
-                  {activeShoe ? (
-                    <div className="rotate-1 scale-105 shadow-2xl">
-                      <ShoeCard shoe={activeShoe} />
+                  <SortableContext items={activeShoes.map(s => s.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-5">
+                      {activeShoes.map(shoe => {
+                        const ref = shoe.sneaker_db_id || `${shoe.brand}|${shoe.model}`.toLowerCase()
+                        return (
+                          <SortableShoeCard
+                            key={shoe.id}
+                            shoe={shoe}
+                            onRetire={() => setRetired(shoe.id, true)}
+                            ratingInfo={ratingMap[ref]}
+                          />
+                        )
+                      })}
                     </div>
-                  ) : null}
-                </DragOverlay>
-              </DndContext>
+                  </SortableContext>
+
+                  <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
+                    {activeShoe ? (
+                      <div className="rotate-1 scale-105 shadow-2xl">
+                        <ShoeCard shoe={activeShoe} />
+                      </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
+              )}
             </section>
 
             {/* Retired Collection */}
