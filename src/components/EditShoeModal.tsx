@@ -121,6 +121,18 @@ export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalP
       setError(updateError.message || 'Update failed')
       setSaving(false)
     } else {
+      // Sync updated color into shared shoe_colorways pool
+      if (shoe.sneaker_db_id && color && brand && model) {
+        const { error: cwErr } = await supabase.from('shoe_colorways').insert({
+          brand,
+          model,
+          color,
+          image_url: imageUrl || null,
+          created_by: user.id,
+        })
+        if (cwErr && cwErr.code !== '23505') console.error('colorway sync:', cwErr)
+      }
+
       if (shoe.sneaker_db_id?.startsWith('c-')) {
         const communityId = shoe.sneaker_db_id.slice(2)
         const { data: communityShoe } = await supabase
