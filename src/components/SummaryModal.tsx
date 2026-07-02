@@ -155,7 +155,7 @@ function truncate(ctx: CanvasRenderingContext2D, text: string, maxW: number) {
 }
 
 function shoeLabel(shoe: Shoe) {
-  return shoe.nickname || `${shoe.brand} ${shoe.model}`
+  return `${shoe.brand} ${shoe.model}`
 }
 
 // ─── View 1 : Donut chart ─────────────────────────────────────────────────
@@ -254,7 +254,7 @@ function drawDonut(canvas: HTMLCanvasElement, shoes: Shoe[]) {
     ctx.font = `600 27px ${FF}`; ctx.fillStyle = '#1C1C1E'; ctx.textAlign = 'left'
     ctx.fillText(truncate(ctx, shoeLabel(shoe), 340), 97, hasSub ? mid - 10 : mid + 9)
     ctx.font = `400 19px ${FF}`; ctx.fillStyle = '#8E8E93'
-    if (hasSub) ctx.fillText(truncate(ctx, `${shoe.brand} ${shoe.model}`, 340), 97, mid + 16)
+    if (hasSub) ctx.fillText(truncate(ctx, shoe.nickname!, 340), 97, mid + 16)
     else ctx.fillText(`${pct.toFixed(1)}%`, 97, mid + 33)
 
     ctx.globalAlpha = 0.12; ctx.fillStyle = color
@@ -420,16 +420,16 @@ function drawTreemap(canvas: HTMLCanvasElement, shoes: Shoe[]) {
 
     if (minSide >= 180) {
       // Large tile: name + km + %
-      const label = shoe.nickname || shoe.model
-      const brand = shoe.nickname ? shoe.brand : ''
+      const label = `${shoe.brand} ${shoe.model}`
+      const nickname = shoe.nickname || ''
       const nameFontSize = Math.max(28, Math.min(62, minSide / 4))
       ctx.font = `700 ${nameFontSize}px ${FF}`
       const nameW = r.w - 24
       ctx.fillText(truncate(ctx, label, nameW), cx, cy - nameFontSize * 0.55)
-      if (brand) {
+      if (nickname) {
         ctx.font = `400 ${nameFontSize * 0.5}px ${FF}`
         ctx.fillStyle = 'rgba(255,255,255,0.6)'
-        ctx.fillText(truncate(ctx, brand, nameW), cx, cy - nameFontSize * 0.55 + nameFontSize * 0.65)
+        ctx.fillText(truncate(ctx, nickname, nameW), cx, cy - nameFontSize * 0.55 + nameFontSize * 0.65)
         ctx.fillStyle = 'rgba(255,255,255,0.95)'
       }
       ctx.font = `800 ${nameFontSize * 0.85}px ${FF}`
@@ -439,7 +439,7 @@ function drawTreemap(canvas: HTMLCanvasElement, shoes: Shoe[]) {
       ctx.fillText(`${pct.toFixed(1)}%`, cx, cy + nameFontSize * 0.85 + nameFontSize * 0.6)
     } else if (minSide >= 90) {
       // Medium tile: name + km
-      const label = shoe.nickname || shoe.model
+      const label = shoe.model
       const fs = Math.max(18, Math.min(34, minSide / 4.5))
       ctx.font = `700 ${fs}px ${FF}`
       ctx.fillText(truncate(ctx, label, r.w - 16), cx, cy - fs * 0.35)
@@ -448,13 +448,13 @@ function drawTreemap(canvas: HTMLCanvasElement, shoes: Shoe[]) {
       ctx.fillText(`${Math.round(km)} km`, cx, cy + fs * 0.75)
     } else if (minSide >= 50) {
       // Small tile: just model name
-      const label = shoe.nickname || shoe.model
+      const label = shoe.model
       const fs = Math.max(13, Math.min(22, minSide / 3.5))
       ctx.font = `600 ${fs}px ${FF}`
       ctx.fillText(truncate(ctx, label, r.w - 10), cx, cy + fs * 0.36)
     } else if (minSide >= 28) {
       // Tiny: abbreviation
-      const abbr = (shoe.nickname || shoe.model).slice(0, 3).toUpperCase()
+      const abbr = shoe.model.slice(0, 3).toUpperCase()
       ctx.font = `600 ${Math.max(11, minSide * 0.28)}px ${FF}`
       ctx.fillText(abbr, cx, cy + 4)
     }

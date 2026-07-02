@@ -196,7 +196,8 @@ export default function ShoeDetailPage() {
           </Link>
           <div className="flex-1 min-w-0">
             <p className="text-[0.6rem] tracking-[0.14em] text-[var(--stone)] uppercase font-medium">{shoe.brand}</p>
-            <p className="text-sm font-semibold text-[var(--ink)] truncate">{shoe.nickname || shoe.model}</p>
+            <p className="text-sm font-semibold text-[var(--ink)] truncate">{shoe.model}</p>
+            {shoe.nickname && <p className="text-[0.65rem] text-[var(--stone)] truncate">{shoe.nickname}</p>}
           </div>
           <div className="flex items-center">
             <button

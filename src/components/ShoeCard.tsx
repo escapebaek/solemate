@@ -63,10 +63,10 @@ export default function ShoeCard({ shoe, onRetire, onReactivate, ratingInfo }: S
             <div>
               <p className="text-[0.6rem] tracking-[0.14em] text-[var(--stone)] uppercase font-medium">{shoe.brand}</p>
               <p className="text-sm font-semibold text-[var(--ink)] truncate mt-0.5">
-                {shoe.nickname || shoe.model}
+                {shoe.model}
               </p>
               {shoe.nickname && (
-                <p className="text-[0.7rem] text-[var(--stone)] truncate">{shoe.model}</p>
+                <p className="text-[0.7rem] text-[var(--stone)] truncate">{shoe.nickname}</p>
               )}
             </div>
 
