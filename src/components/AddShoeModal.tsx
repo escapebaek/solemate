@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Search, Loader2, Check, ChevronDown, ChevronUp, Plus } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Search, Loader2, Check, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { API_BASE } from '@/lib/api'
 import { SneakerSearchResult } from '@/lib/types'
+import { isAdmin } from '@/lib/colorway'
 import Image from 'next/image'
 
 interface AddShoeModalProps {
@@ -23,16 +24,18 @@ function ColorwayCard({
   colorway,
   isSelected,
   onSelect,
+  onDelete,
 }: {
   colorway: Colorway
   isSelected: boolean
   onSelect: () => void
+  onDelete?: () => void
 }) {
   return (
     <button
       type="button"
       onClick={onSelect}
-      className={`relative border-2 h-24 overflow-hidden transition-all ${
+      className={`relative border-2 h-24 overflow-hidden transition-all group ${
         isSelected
           ? 'border-[var(--ink)] shadow-sm'
           : 'border-[var(--border)] hover:border-[var(--border-strong)]'
@@ -60,6 +63,17 @@ function ColorwayCard({
       {isSelected && (
         <div className="absolute top-1 right-1 bg-white rounded-full w-4 h-4 flex items-center justify-center border border-[var(--ink)]">
           <Check size={9} strokeWidth={3} className="text-[var(--ink)]" />
+        </div>
+      )}
+      {onDelete && (
+        <div
+          className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity"
+          onPointerDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); e.preventDefault(); onDelete() }}
+        >
+          <div className="bg-white/90 w-5 h-5 flex items-center justify-center border border-[var(--danger)] text-[var(--danger)] cursor-pointer hover:bg-red-50 transition-colors">
+            <Trash2 size={10} />
+          </div>
         </div>
       )}
     </button>
@@ -108,6 +122,11 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [userId, setUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => setUserId(user?.id ?? null))
+  }, [])
 
   async function searchSneakers() {
     if (!query.trim()) return
@@ -231,6 +250,17 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
     }
 
     loadColorways(result.brand || '', result.name || result.model || '', defaultCw)
+  }
+
+  async function deleteColorway(id: string) {
+    if (!confirm('이 컬러웨이를 삭제하시겠습니까?')) return
+    const { error: delErr } = await supabase.from('shoe_colorways').delete().eq('id', id)
+    if (delErr) { console.error('delete colorway:', delErr); return }
+    setColorways(prev => prev.filter(cw => cw.id !== id))
+    if (selectedColorway?.id === id) {
+      const fallback: Colorway = { id: 'default', color: selected?.colorway || 'Default', image_url: selected?.thumbnail ?? null, isDefault: true }
+      selectColorway(fallback)
+    }
   }
 
   function clearSelection() {
@@ -608,6 +638,7 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
                         colorway={cw}
                         isSelected={selectedColorway?.id === cw.id}
                         onSelect={() => selectColorway(cw)}
+                        onDelete={!cw.isDefault && isAdmin(userId) ? () => deleteColorway(cw.id) : undefined}
                       />
                     ))}
 
