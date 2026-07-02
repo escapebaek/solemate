@@ -71,11 +71,18 @@ type ShoeAgg = {
   ratingCount: number
 }
 
-type CommunityShoe = {
+type RawCommunityShoe = {
   id: string
   brand: string
   model: string
   image_url: string | null
+}
+
+type ShoeEntry = {
+  shoeRef: string
+  brand: string
+  model: string
+  imageUrl: string | null
 }
 
 type ActiveFilter =
@@ -93,68 +100,105 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
   const [loading, setLoading] = useState(true)
   const [searchText, setSearchText] = useState('')
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>(null)
-  const [communityShoes, setCommunityShoes] = useState<CommunityShoe[]>([])
-  const [aggMap, setAggMap] = useState<Map<string, ShoeAgg>>(new Map())
-  const [fallbackImages, setFallbackImages] = useState<Record<string, string>>({})
 
-  // shoeRef → user's shoe.id (for owned navigation)
+  // Raw community_shoes from DB (unfiltered)
+  const [rawCommunityShoes, setRawCommunityShoes] = useState<RawCommunityShoe[]>([])
+  // Image fallbacks for community shoes without image_url
+  const [imgFallbacks, setImgFallbacks] = useState<Record<string, string>>({})
+  // Aggregated ratings for all shoe refs
+  const [aggMap, setAggMap] = useState<Map<string, ShoeAgg>>(new Map())
+
+  // shoeRef → user's shoe.id (for navigation to detail page)
   const ownedMap = useMemo(
-    () => new Map(userShoes.filter(s => s.sneaker_db_id).map(s => [s.sneaker_db_id!, s.id])),
+    () =>
+      new Map(
+        userShoes
+          .filter(s => s.sneaker_db_id)
+          .map(s => [s.sneaker_db_id!, s.id])
+      ),
     [userShoes]
   )
 
   useEffect(() => {
     async function load() {
-      const { data: shoes } = await supabase
+      // 1. Fetch all community shoes from DB
+      const { data: cData } = await supabase
         .from('community_shoes')
         .select('id, brand, model, image_url')
-      if (!shoes) { setLoading(false); return }
+      const cShoes = (cData || []) as RawCommunityShoe[]
+      setRawCommunityShoes(cShoes)
 
-      setCommunityShoes(shoes as CommunityShoe[])
-      const shoeRefs = (shoes as CommunityShoe[]).map(s => `c-${s.id}`)
+      // 2. Collect all shoe refs to query ratings for:
+      //    - community shoe refs (c-xxx)
+      //    - non-community user shoe refs (n-xxx, brand|model, etc.)
+      const communityRefs = cShoes.map(s => `c-${s.id}`)
+      const nonCommunityRefs = [
+        ...new Set(
+          userShoes
+            .filter(s => s.sneaker_db_id && !s.sneaker_db_id.startsWith('c-'))
+            .map(s => s.sneaker_db_id!)
+        ),
+      ]
+      const allRefs = [...communityRefs, ...nonCommunityRefs]
 
-      const { data: ratings } = await supabase
-        .from('shoe_ratings')
-        .select('shoe_ref, categories, toe_box, midsole_feel, outsole_grip, breathability, durability, rating')
-        .in('shoe_ref', shoeRefs)
+      // 3. Fetch ratings for all refs
+      if (allRefs.length > 0) {
+        const { data: ratings } = await supabase
+          .from('shoe_ratings')
+          .select(
+            'shoe_ref, categories, toe_box, midsole_feel, outsole_grip, breathability, durability, rating'
+          )
+          .in('shoe_ref', allRefs)
 
-      const map = new Map<string, ShoeAgg>()
-      for (const r of (ratings || []) as Record<string, unknown>[]) {
-        const ref = r.shoe_ref as string
-        if (!map.has(ref)) {
-          map.set(ref, {
-            catCounts: {}, catVoters: 0,
-            attrCounts: {}, attrTotals: {},
-            ratingSum: 0, ratingCount: 0,
-          })
-        }
-        const agg = map.get(ref)!
+        // 4. Build aggMap
+        const map = new Map<string, ShoeAgg>()
+        for (const r of (ratings || []) as Record<string, unknown>[]) {
+          const ref = r.shoe_ref as string
+          if (!map.has(ref)) {
+            map.set(ref, {
+              catCounts: {},
+              catVoters: 0,
+              attrCounts: {},
+              attrTotals: {},
+              ratingSum: 0,
+              ratingCount: 0,
+            })
+          }
+          const agg = map.get(ref)!
 
-        const cats = r.categories as string[] | null
-        if (cats && cats.length > 0) {
-          agg.catVoters++
-          for (const c of cats) agg.catCounts[c] = (agg.catCounts[c] ?? 0) + 1
-        }
+          const cats = r.categories as string[] | null
+          if (cats && cats.length > 0) {
+            agg.catVoters++
+            for (const c of cats) agg.catCounts[c] = (agg.catCounts[c] ?? 0) + 1
+          }
 
-        for (const k of ['toe_box', 'midsole_feel', 'outsole_grip', 'breathability', 'durability']) {
-          const v = r[k] as string | null
-          if (v) {
-            if (!agg.attrCounts[k]) agg.attrCounts[k] = {}
-            agg.attrCounts[k][v] = (agg.attrCounts[k][v] ?? 0) + 1
-            agg.attrTotals[k] = (agg.attrTotals[k] ?? 0) + 1
+          for (const k of ['toe_box', 'midsole_feel', 'outsole_grip', 'breathability', 'durability']) {
+            const v = r[k] as string | null
+            if (v) {
+              if (!agg.attrCounts[k]) agg.attrCounts[k] = {}
+              agg.attrCounts[k][v] = (agg.attrCounts[k][v] ?? 0) + 1
+              agg.attrTotals[k] = (agg.attrTotals[k] ?? 0) + 1
+            }
+          }
+
+          const rat = r.rating as number | null
+          if (rat != null) {
+            agg.ratingSum += rat
+            agg.ratingCount++
           }
         }
-
-        const rat = r.rating as number | null
-        if (rat != null) { agg.ratingSum += rat; agg.ratingCount++ }
+        setAggMap(map)
       }
-      setAggMap(map)
 
-      const noImg = (shoes as CommunityShoe[]).filter(s => !s.image_url)
+      // 5. Load image fallbacks for community shoes without image_url
+      const noImg = cShoes.filter(s => !s.image_url)
       if (noImg.length > 0) {
         const pairs = [
           ...new Map(
-            noImg.map(s => [`${s.brand.toLowerCase()}|${s.model.toLowerCase()}`, { brand: s.brand, model: s.model }])
+            noImg.map(s => [
+              `${s.brand.toLowerCase()}|${s.model.toLowerCase()}`,
+              { brand: s.brand, model: s.model },
+            ])
           ).values(),
         ]
         const fallbacks: Record<string, string> = {}
@@ -171,59 +215,102 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
             if (img) fallbacks[`${brand.toLowerCase()}|${model.toLowerCase()}`] = img
           })
         )
-        setFallbackImages(fallbacks)
+        setImgFallbacks(fallbacks)
       }
 
       setLoading(false)
     }
+
     load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Build the unified shoe list reactively from loaded data + userShoes prop
+  const shoeList = useMemo<ShoeEntry[]>(() => {
+    // Community shoes: only show if the current user owns it OR it has at least one rating
+    const communityEntries = rawCommunityShoes
+      .filter(s => {
+        const ref = `c-${s.id}`
+        return ownedMap.has(ref) || aggMap.has(ref)
+      })
+      .map(s => {
+        const imgKey = `${s.brand.toLowerCase()}|${s.model.toLowerCase()}`
+        return {
+          shoeRef: `c-${s.id}`,
+          brand: s.brand,
+          model: s.model,
+          imageUrl: s.image_url || imgFallbacks[imgKey] || null,
+        }
+      })
+
+    // Non-community user shoes (n-xxx etc.) not already in community list
+    const communityRefSet = new Set(communityEntries.map(e => e.shoeRef))
+    const seenNonCommunity = new Set<string>()
+    const nonCommunityEntries: ShoeEntry[] = []
+
+    for (const s of userShoes) {
+      if (!s.sneaker_db_id || s.sneaker_db_id.startsWith('c-')) continue
+      if (communityRefSet.has(s.sneaker_db_id)) continue
+      if (seenNonCommunity.has(s.sneaker_db_id)) continue
+      seenNonCommunity.add(s.sneaker_db_id)
+      nonCommunityEntries.push({
+        shoeRef: s.sneaker_db_id,
+        brand: s.brand,
+        model: s.model,
+        imageUrl: s.image_url || null,
+      })
+    }
+
+    return [...communityEntries, ...nonCommunityEntries]
+  }, [rawCommunityShoes, imgFallbacks, aggMap, ownedMap, userShoes])
 
   const results = useMemo(() => {
     const q = searchText.trim().toLowerCase()
 
-    let list = communityShoes.filter(s =>
-      !q ||
-      s.brand.toLowerCase().includes(q) ||
-      s.model.toLowerCase().includes(q) ||
-      `${s.brand} ${s.model}`.toLowerCase().includes(q)
+    let list = shoeList.filter(
+      s =>
+        !q ||
+        s.brand.toLowerCase().includes(q) ||
+        s.model.toLowerCase().includes(q) ||
+        `${s.brand} ${s.model}`.toLowerCase().includes(q)
     )
 
     if (activeFilter?.type === 'category') {
       const cat = activeFilter.value
-      list = list.filter(s => (aggMap.get(`c-${s.id}`)?.catCounts[cat] ?? 0) > 0)
+      list = list.filter(s => (aggMap.get(s.shoeRef)?.catCounts[cat] ?? 0) > 0)
       list.sort((a, b) => {
-        const aggA = aggMap.get(`c-${a.id}`)
-        const aggB = aggMap.get(`c-${b.id}`)
+        const aggA = aggMap.get(a.shoeRef)
+        const aggB = aggMap.get(b.shoeRef)
         const pA = aggA && aggA.catVoters > 0 ? aggA.catCounts[cat] / aggA.catVoters : 0
         const pB = aggB && aggB.catVoters > 0 ? aggB.catCounts[cat] / aggB.catVoters : 0
         return pB - pA
       })
     } else if (activeFilter?.type === 'attr') {
       const { key, value } = activeFilter
-      list = list.filter(s => (aggMap.get(`c-${s.id}`)?.attrCounts[key]?.[value] ?? 0) > 0)
+      list = list.filter(s => (aggMap.get(s.shoeRef)?.attrCounts[key]?.[value] ?? 0) > 0)
       list.sort((a, b) => {
-        const aggA = aggMap.get(`c-${a.id}`)
-        const aggB = aggMap.get(`c-${b.id}`)
-        const pA = aggA && aggA.attrTotals[key] > 0
-          ? (aggA.attrCounts[key]?.[value] ?? 0) / aggA.attrTotals[key] : 0
-        const pB = aggB && aggB.attrTotals[key] > 0
-          ? (aggB.attrCounts[key]?.[value] ?? 0) / aggB.attrTotals[key] : 0
+        const aggA = aggMap.get(a.shoeRef)
+        const aggB = aggMap.get(b.shoeRef)
+        const pA =
+          aggA && aggA.attrTotals[key] > 0
+            ? (aggA.attrCounts[key]?.[value] ?? 0) / aggA.attrTotals[key]
+            : 0
+        const pB =
+          aggB && aggB.attrTotals[key] > 0
+            ? (aggB.attrCounts[key]?.[value] ?? 0) / aggB.attrTotals[key]
+            : 0
         return pB - pA
       })
     } else {
       // Default: most reviewed first
-      list.sort((a, b) =>
-        (aggMap.get(`c-${b.id}`)?.ratingCount ?? 0) - (aggMap.get(`c-${a.id}`)?.ratingCount ?? 0)
+      list.sort(
+        (a, b) =>
+          (aggMap.get(b.shoeRef)?.ratingCount ?? 0) - (aggMap.get(a.shoeRef)?.ratingCount ?? 0)
       )
     }
 
     return list.map(s => {
-      const shoeRef = `c-${s.id}`
-      const agg = aggMap.get(shoeRef)
-      const imgKey = `${s.brand.toLowerCase()}|${s.model.toLowerCase()}`
-      const imageUrl = s.image_url || fallbackImages[imgKey] || null
+      const agg = aggMap.get(s.shoeRef)
 
       let metric: { pct: number; label: string; voters: number } | null = null
       if (activeFilter?.type === 'category' && agg && agg.catVoters > 0) {
@@ -233,10 +320,18 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
           label: activeFilter.label,
           voters: agg.catVoters,
         }
-      } else if (activeFilter?.type === 'attr' && agg && agg.attrTotals[activeFilter.key] > 0) {
+      } else if (
+        activeFilter?.type === 'attr' &&
+        agg &&
+        agg.attrTotals[activeFilter.key] > 0
+      ) {
         const count = agg.attrCounts[activeFilter.key]?.[activeFilter.value] ?? 0
-        const attrLabel = activeFilter.key === 'toe_box' ? 'Toe Box'
-          : activeFilter.key === 'midsole_feel' ? 'Midsole' : 'Grip'
+        const attrLabel =
+          activeFilter.key === 'toe_box'
+            ? 'Toe Box'
+            : activeFilter.key === 'midsole_feel'
+              ? 'Midsole'
+              : 'Grip'
         metric = {
           pct: Math.round((count / agg.attrTotals[activeFilter.key]) * 100),
           label: `${activeFilter.label} ${attrLabel}`,
@@ -245,21 +340,25 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
       }
 
       return {
-        s,
-        shoeRef,
-        imageUrl,
+        ...s,
         agg,
         metric,
-        ownedShoeId: ownedMap.get(shoeRef),
+        ownedShoeId: ownedMap.get(s.shoeRef),
       }
     })
-  }, [communityShoes, aggMap, fallbackImages, searchText, activeFilter, ownedMap])
+  }, [shoeList, aggMap, searchText, activeFilter, ownedMap])
 
   function toggleFilter(f: NonNullable<ActiveFilter>) {
     setActiveFilter(prev => {
       if (!prev) return f
       if (f.type === 'category' && prev.type === 'category' && prev.value === f.value) return null
-      if (f.type === 'attr' && prev.type === 'attr' && prev.key === f.key && prev.value === f.value) return null
+      if (
+        f.type === 'attr' &&
+        prev.type === 'attr' &&
+        prev.key === f.key &&
+        prev.value === f.value
+      )
+        return null
       return f
     })
   }
@@ -276,7 +375,7 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
             <X size={18} />
           </button>
           <p className="text-[0.6rem] tracking-[0.2em] text-[var(--stone)] uppercase font-medium flex-1">
-            Explore Community
+            Explore
           </p>
         </div>
       </div>
@@ -315,11 +414,14 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {group.items.map(item => {
-                    const isActive = activeFilter?.type === 'category' && activeFilter.value === item.value
+                    const isActive =
+                      activeFilter?.type === 'category' && activeFilter.value === item.value
                     return (
                       <button
                         key={item.value}
-                        onClick={() => toggleFilter({ type: 'category', value: item.value, label: item.label })}
+                        onClick={() =>
+                          toggleFilter({ type: 'category', value: item.value, label: item.label })
+                        }
                         className={`px-2.5 py-1 text-[0.62rem] tracking-wide border rounded-sm transition-all ${
                           isActive
                             ? 'bg-[var(--ink)] text-white border-[var(--ink)]'
@@ -349,7 +451,12 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
                       <button
                         key={opt.value}
                         onClick={() =>
-                          toggleFilter({ type: 'attr', key: group.key, value: opt.value, label: opt.label })
+                          toggleFilter({
+                            type: 'attr',
+                            key: group.key,
+                            value: opt.value,
+                            label: opt.label,
+                          })
                         }
                         className={`px-2.5 py-1 text-[0.62rem] tracking-wide border rounded-sm transition-all ${
                           isActive
@@ -377,7 +484,7 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
             <div className="max-w-2xl mx-auto px-4 py-4">
               {results.length === 0 ? (
                 <p className="text-center text-xs text-[var(--stone)] py-16">
-                  {searchText || activeFilter ? 'No matching shoes' : 'No community shoes yet'}
+                  {searchText || activeFilter ? 'No matching shoes' : 'No shoes found'}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -396,7 +503,7 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
                     )}
                   </p>
 
-                  {results.map(({ s, shoeRef, imageUrl, agg, metric, ownedShoeId }) => {
+                  {results.map(({ shoeRef, brand, model, imageUrl, agg, metric, ownedShoeId }) => {
                     const avgRating =
                       agg && agg.ratingCount > 0
                         ? (agg.ratingSum / agg.ratingCount).toFixed(1)
@@ -409,7 +516,7 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
                           {imageUrl ? (
                             <img
                               src={imageUrl}
-                              alt={`${s.brand} ${s.model}`}
+                              alt={`${brand} ${model}`}
                               className="w-full h-full object-contain"
                             />
                           ) : (
@@ -421,9 +528,11 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-[0.55rem] tracking-[0.12em] text-[var(--stone)] uppercase">{s.brand}</p>
+                          <p className="text-[0.55rem] tracking-[0.12em] text-[var(--stone)] uppercase">
+                            {brand}
+                          </p>
                           <p className="text-[0.82rem] font-semibold text-[var(--ink)] truncate leading-tight">
-                            {s.model}
+                            {model}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             {avgRating && (
@@ -440,16 +549,18 @@ export default function ExploreModal({ userShoes, onClose }: Props) {
                         </div>
 
                         {/* Metric badge */}
-                        {metric ? (
+                        {metric && (
                           <div className="shrink-0 text-right min-w-[3.5rem]">
-                            <p className="text-xl font-black text-[var(--ink)] leading-none">{metric.pct}%</p>
-                            <p className="text-[0.52rem] text-[var(--stone)] mt-0.5 leading-tight">{metric.label}</p>
-                            <p className="text-[0.52rem] text-[var(--stone-light)]">{metric.voters} votes</p>
+                            <p className="text-xl font-black text-[var(--ink)] leading-none">
+                              {metric.pct}%
+                            </p>
+                            <p className="text-[0.52rem] text-[var(--stone)] mt-0.5 leading-tight">
+                              {metric.label}
+                            </p>
+                            <p className="text-[0.52rem] text-[var(--stone-light)]">
+                              {metric.voters} votes
+                            </p>
                           </div>
-                        ) : (
-                          agg && agg.ratingCount === 0 && !avgRating && (
-                            <span className="text-[0.52rem] text-[var(--stone-light)] shrink-0">No ratings</span>
-                          )
                         )}
                       </div>
                     )
