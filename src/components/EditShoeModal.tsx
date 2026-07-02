@@ -12,6 +12,8 @@ interface EditShoeModalProps {
   onSaved: (updated: Shoe) => void
 }
 
+const toNum = (val: string | undefined | null) => val?.replace(/[^\d.]/g, '') ?? ''
+
 export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalProps) {
   const supabase = createClient()
 
@@ -19,15 +21,15 @@ export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalP
   const [model, setModel] = useState(shoe.model)
   const [nickname, setNickname] = useState(shoe.nickname ?? '')
   const [color, setColor] = useState(shoe.color ?? '')
-  const [size, setSize] = useState(shoe.size ?? '')
+  const [size, setSize] = useState(toNum(shoe.size))
   const [maxMileage, setMaxMileage] = useState(String(shoe.max_mileage))
   const [notes, setNotes] = useState(shoe.notes ?? '')
   const [purchaseDate, setPurchaseDate] = useState(shoe.purchase_date ?? '')
 
   // Specs
-  const [weight, setWeight] = useState(shoe.specs?.weight ?? '')
-  const [drop, setDrop] = useState(shoe.specs?.drop ?? '')
-  const [stackHeight, setStackHeight] = useState(shoe.specs?.stack_height ?? '')
+  const [weight, setWeight] = useState(toNum(shoe.specs?.weight))
+  const [drop, setDrop] = useState(toNum(shoe.specs?.drop))
+  const [stackHeight, setStackHeight] = useState(toNum(shoe.specs?.stack_height))
   const [msrp, setMsrp] = useState(shoe.specs?.msrp != null ? String(shoe.specs.msrp) : '')
   const [purchasePrice, setPurchasePrice] = useState(shoe.specs?.purchase_price != null ? String(shoe.specs.purchase_price) : '')
   const [purchaseCurrency, setPurchaseCurrency] = useState(shoe.specs?.purchase_currency ?? 'KRW')
@@ -91,9 +93,9 @@ export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalP
 
     const updatedSpecs = {
       ...shoe.specs,
-      weight: weight || undefined,
-      drop: drop || undefined,
-      stack_height: stackHeight || undefined,
+      weight: weight ? weight + 'g' : undefined,
+      drop: drop ? drop + 'mm' : undefined,
+      stack_height: stackHeight ? stackHeight + 'mm' : undefined,
       msrp: msrp ? parseFloat(msrp) : undefined,
       purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
       purchase_currency: purchasePrice ? purchaseCurrency : undefined,
@@ -105,7 +107,7 @@ export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalP
       model,
       nickname: nickname || null,
       color: color || null,
-      size: size || null,
+      size: size ? size + 'mm' : null,
       max_mileage: parseFloat(maxMileage) || shoe.max_mileage,
       notes: notes || null,
       purchase_date: purchaseDate || null,
@@ -119,13 +121,31 @@ export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalP
       setError(updateError.message || 'Update failed')
       setSaving(false)
     } else {
+      if (shoe.sneaker_db_id?.startsWith('c-')) {
+        const communityId = shoe.sneaker_db_id.slice(2)
+        const { data: communityShoe } = await supabase
+          .from('community_shoes')
+          .select('weight, drop, stack_height')
+          .eq('id', communityId)
+          .maybeSingle()
+        if (communityShoe) {
+          const specsPatch: Record<string, string> = {}
+          if (!communityShoe.weight && weight) specsPatch.weight = weight + 'g'
+          if (!communityShoe.drop && drop) specsPatch.drop = drop + 'mm'
+          if (!communityShoe.stack_height && stackHeight) specsPatch.stack_height = stackHeight + 'mm'
+          if (Object.keys(specsPatch).length > 0) {
+            await supabase.from('community_shoes').update(specsPatch).eq('id', communityId)
+          }
+        }
+      }
+
       const updated: Shoe = {
         ...shoe,
         brand,
         model,
         nickname: nickname || undefined,
         color: color || undefined,
-        size: size || undefined,
+        size: size ? size + 'mm' : undefined,
         max_mileage: parseFloat(maxMileage) || shoe.max_mileage,
         notes: notes || undefined,
         purchase_date: purchaseDate || undefined,
@@ -259,7 +279,10 @@ export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalP
               </div>
               <div>
                 <label className="block text-[0.62rem] tracking-[0.12em] uppercase text-[var(--stone)] font-medium mb-1.5">Size</label>
-                <input value={size} onChange={e => setSize(e.target.value)} className="input-luxury" placeholder="270" />
+                <div className="relative">
+                  <input value={size} onChange={e => setSize(e.target.value)} inputMode="decimal" className="input-luxury pr-9" placeholder="270" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.7rem] text-[var(--stone)] pointer-events-none">mm</span>
+                </div>
               </div>
             </div>
 
@@ -354,18 +377,27 @@ export default function EditShoeModal({ shoe, onClose, onSaved }: EditShoeModalP
               </div>
               <div>
                 <label className="block text-[0.62rem] tracking-[0.12em] uppercase text-[var(--stone)] font-medium mb-1.5">Weight</label>
-                <input value={weight} onChange={e => setWeight(e.target.value)} className="input-luxury" placeholder="280g" />
+                <div className="relative">
+                  <input value={weight} onChange={e => setWeight(e.target.value)} inputMode="decimal" className="input-luxury pr-7" placeholder="280" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.7rem] text-[var(--stone)] pointer-events-none">g</span>
+                </div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[0.62rem] tracking-[0.12em] uppercase text-[var(--stone)] font-medium mb-1.5">Heel-Toe Drop</label>
-                <input value={drop} onChange={e => setDrop(e.target.value)} className="input-luxury" placeholder="10mm" />
+                <div className="relative">
+                  <input value={drop} onChange={e => setDrop(e.target.value)} inputMode="decimal" className="input-luxury pr-9" placeholder="10" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.7rem] text-[var(--stone)] pointer-events-none">mm</span>
+                </div>
               </div>
               <div>
                 <label className="block text-[0.62rem] tracking-[0.12em] uppercase text-[var(--stone)] font-medium mb-1.5">Stack Height</label>
-                <input value={stackHeight} onChange={e => setStackHeight(e.target.value)} className="input-luxury" placeholder="36mm" />
+                <div className="relative">
+                  <input value={stackHeight} onChange={e => setStackHeight(e.target.value)} inputMode="decimal" className="input-luxury pr-9" placeholder="36" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.7rem] text-[var(--stone)] pointer-events-none">mm</span>
+                </div>
               </div>
             </div>
           </div>

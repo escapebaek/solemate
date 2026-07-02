@@ -107,3 +107,37 @@ create policy "Users can view their run screenshots"
 create policy "Users can delete their run screenshots"
   on storage.objects for delete
   using (bucket_id = 'run-screenshots' and auth.uid()::text = (storage.foldername(name))[1]);
+
+-- Community shoes table (shared across all users)
+create table if not exists public.community_shoes (
+  id uuid default uuid_generate_v4() primary key,
+  brand text not null,
+  model text not null,
+  name text,
+  colorway text,
+  gender text,
+  retail_price numeric,
+  description text,
+  weight text,
+  drop text,
+  stack_height text,
+  cushioning text,
+  image_url text,
+  usage_count integer default 0,
+  submitted_by uuid references auth.users(id),
+  created_at timestamptz default now() not null
+);
+
+alter table public.community_shoes enable row level security;
+
+create policy "Anyone can view community shoes"
+  on public.community_shoes for select
+  using (true);
+
+create policy "Authenticated users can insert community shoes"
+  on public.community_shoes for insert
+  with check (auth.uid() is not null);
+
+create policy "Authenticated users can update community shoes"
+  on public.community_shoes for update
+  using (auth.uid() is not null);

@@ -66,6 +66,8 @@ function ColorwayCard({
   )
 }
 
+const toNum = (val: string | undefined | null) => val?.replace(/[^\d.]/g, '') ?? ''
+
 export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
   const supabase = createClient()
 
@@ -208,9 +210,9 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
     setSelected(result)
     setBrand(result.brand || '')
     setModel(result.name || result.model || '')
-    setWeight(result.weight ?? '')
-    setDrop(result.drop ?? '')
-    setStackHeight(result.stack_height ?? '')
+    setWeight(toNum(result.weight))
+    setDrop(toNum(result.drop))
+    setStackHeight(toNum(result.stack_height))
     setSearchResults([])
     setSearchOpen(false)
 
@@ -309,9 +311,9 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
             cushioning: selected.cushioning,
           }
         : {}),
-      weight: weight || undefined,
-      drop: drop || undefined,
-      stack_height: stackHeight || undefined,
+      weight: weight ? weight + 'g' : undefined,
+      drop: drop ? drop + 'mm' : undefined,
+      stack_height: stackHeight ? stackHeight + 'mm' : undefined,
     }
     const hasSpecs = Object.values(specs).some(v => v !== undefined)
 
@@ -320,13 +322,21 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
     if (!selected) {
       const { data: existing } = await supabase
         .from('community_shoes')
-        .select('id')
+        .select('id, weight, drop, stack_height')
         .ilike('brand', brand)
         .ilike('model', model)
         .maybeSingle()
 
       if (existing) {
         communityId = `c-${existing.id}`
+        // Fill in any missing specs on the community record
+        const specsPatch: Record<string, string> = {}
+        if (!existing.weight && weight) specsPatch.weight = weight + 'g'
+        if (!existing.drop && drop) specsPatch.drop = drop + 'mm'
+        if (!existing.stack_height && stackHeight) specsPatch.stack_height = stackHeight + 'mm'
+        if (Object.keys(specsPatch).length > 0) {
+          await supabase.from('community_shoes').update(specsPatch).eq('id', existing.id)
+        }
       } else {
         const { data: newEntry } = await supabase
           .from('community_shoes')
@@ -336,14 +346,26 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
             name: `${brand} ${model}`,
             colorway: color || null,
             image_url: finalImageUrl,
-            weight: weight || null,
-            drop: drop || null,
-            stack_height: stackHeight || null,
+            weight: weight ? weight + 'g' : null,
+            drop: drop ? drop + 'mm' : null,
+            stack_height: stackHeight ? stackHeight + 'mm' : null,
             submitted_by: user.id,
           })
           .select('id')
           .single()
         if (newEntry) communityId = `c-${newEntry.id}`
+      }
+    }
+
+    // Community shoe selected from search → fill in missing specs on the community record
+    if (selected?.id?.startsWith('c-')) {
+      const communityShoeId = selected.id.slice(2)
+      const specsPatch: Record<string, string> = {}
+      if (!selected.weight && weight) specsPatch.weight = weight + 'g'
+      if (!selected.drop && drop) specsPatch.drop = drop + 'mm'
+      if (!selected.stack_height && stackHeight) specsPatch.stack_height = stackHeight + 'mm'
+      if (Object.keys(specsPatch).length > 0) {
+        await supabase.from('community_shoes').update(specsPatch).eq('id', communityShoeId)
       }
     }
 
@@ -353,7 +375,7 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
       model,
       nickname: nickname || null,
       color: color || null,
-      size: size || null,
+      size: size ? size + 'mm' : null,
       image_url: finalImageUrl,
       max_mileage: parseFloat(maxMileage) || 800,
       current_mileage: 0,
@@ -774,12 +796,16 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
                 <label className="block text-[0.62rem] tracking-[0.12em] uppercase text-[var(--stone)] font-medium mb-1.5">
                   Size
                 </label>
-                <input
-                  value={size}
-                  onChange={e => setSize(e.target.value)}
-                  className="input-luxury"
-                  placeholder="270"
-                />
+                <div className="relative">
+                  <input
+                    value={size}
+                    onChange={e => setSize(e.target.value)}
+                    inputMode="decimal"
+                    className="input-luxury pr-9"
+                    placeholder="270"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.7rem] text-[var(--stone)] pointer-events-none">mm</span>
+                </div>
               </div>
             </div>
 
@@ -823,34 +849,46 @@ export default function AddShoeModal({ onClose, onAdded }: AddShoeModalProps) {
                   <label className="block text-[0.62rem] tracking-[0.12em] uppercase text-[var(--stone)] font-medium mb-1.5">
                     Weight
                   </label>
-                  <input
-                    value={weight}
-                    onChange={e => setWeight(e.target.value)}
-                    className="input-luxury"
-                    placeholder="280g"
-                  />
+                  <div className="relative">
+                    <input
+                      value={weight}
+                      onChange={e => setWeight(e.target.value)}
+                      inputMode="decimal"
+                      className="input-luxury pr-7"
+                      placeholder="280"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.7rem] text-[var(--stone)] pointer-events-none">g</span>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[0.62rem] tracking-[0.12em] uppercase text-[var(--stone)] font-medium mb-1.5">
                     Drop
                   </label>
-                  <input
-                    value={drop}
-                    onChange={e => setDrop(e.target.value)}
-                    className="input-luxury"
-                    placeholder="10mm"
-                  />
+                  <div className="relative">
+                    <input
+                      value={drop}
+                      onChange={e => setDrop(e.target.value)}
+                      inputMode="decimal"
+                      className="input-luxury pr-9"
+                      placeholder="10"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.7rem] text-[var(--stone)] pointer-events-none">mm</span>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[0.62rem] tracking-[0.12em] uppercase text-[var(--stone)] font-medium mb-1.5">
                     Stack
                   </label>
-                  <input
-                    value={stackHeight}
-                    onChange={e => setStackHeight(e.target.value)}
-                    className="input-luxury"
-                    placeholder="36mm"
-                  />
+                  <div className="relative">
+                    <input
+                      value={stackHeight}
+                      onChange={e => setStackHeight(e.target.value)}
+                      inputMode="decimal"
+                      className="input-luxury pr-9"
+                      placeholder="36"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.7rem] text-[var(--stone)] pointer-events-none">mm</span>
+                  </div>
                 </div>
               </div>
             </div>
