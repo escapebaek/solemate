@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, LogOut, PieChart, GripVertical, Check } from 'lucide-react'
+import { Plus, LogOut, PieChart, GripVertical, Check, Search } from 'lucide-react'
 import {
   DndContext,
   DragEndEvent,
@@ -26,6 +26,7 @@ import ShoeCard from '@/components/ShoeCard'
 import SortableShoeCard from '@/components/SortableShoeCard'
 import AddShoeModal from '@/components/AddShoeModal'
 import SummaryModal from '@/components/SummaryModal'
+import ExploreModal from '@/components/ExploreModal'
 
 export default function HomePage() {
   const router = useRouter()
@@ -35,6 +36,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
+  const [showExplore, setShowExplore] = useState(false)
   const [ratingMap, setRatingMap] = useState<Record<string, { avg: number; count: number }>>({})
   const [userId, setUserId] = useState('')
   const [userEmail, setUserEmail] = useState('')
@@ -187,6 +189,15 @@ export default function HomePage() {
                 <span className="text-[var(--ink)] font-bold">{totalMileage.toFixed(0)}</span>
               </div>
             </div>
+
+            <button
+              onClick={() => setShowExplore(true)}
+              title="Explore community shoes"
+              className="btn-secondary py-2 px-3.5 text-[0.65rem]"
+            >
+              <Search size={13} />
+              <span className="hidden sm:inline">Explore</span>
+            </button>
 
             {shoes.length > 0 && (
               <button
@@ -353,6 +364,10 @@ export default function HomePage() {
 
       {showSummary && (
         <SummaryModal shoes={activeShoes} onClose={() => setShowSummary(false)} />
+      )}
+
+      {showExplore && (
+        <ExploreModal userShoes={shoes} onClose={() => setShowExplore(false)} />
       )}
     </div>
   )
